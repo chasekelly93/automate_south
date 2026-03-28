@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShopCommand — Leaky Bucket Audit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:       #0f172a;
+      --navy-800:   #1e293b;
+      --navy-700:   #273549;
+      --navy-600:   #334155;
+      --amber:      #f59e0b;
+      --amber-dark: #d97706;
+      --amber-light:#fcd34d;
+      --white:      #ffffff;
+      --gray-100:   #f1f5f9;
+      --gray-300:   #cbd5e1;
+      --gray-400:   #94a3b8;
+      --gray-500:   #64748b;
+      --green:      #22c55e;
+      --yellow:     #eab308;
+      --orange:     #f97316;
+      --red:        #ef4444;
+      --radius:     12px;
+      --radius-lg:  20px;
+      --shadow:     0 4px 24px rgba(0,0,0,.35);
+      --transition: .35s cubic-bezier(.4,0,.2,1);
+    }
+
+    html { font-size: 16px; scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── HEADER ─────────────────────────────────────── */
+    .site-header {
+      width: 100%;
+      background: rgba(15,23,42,.95);
+      border-bottom: 1px solid var(--navy-700);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--amber);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .logo-text {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -.3px;
+    }
+
+    .logo-text span { color: var(--amber); }
+
+    .header-badge {
+      font-size: .7rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--amber);
+      background: rgba(245,158,11,.12);
+      border: 1px solid rgba(245,158,11,.25);
+      padding: 4px 10px;
+      border-radius: 100px;
+    }
+
+    /* ── MAIN WRAPPER ───────────────────────────────── */
+    .wrapper {
+      width: 100%;
+      max-width: 720px;
+      padding: 40px 20px 80px;
+    }
+
+    /* ── HERO ───────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .hero-eyebrow {
+      display: inline-block;
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--amber);
+      margin-bottom: 16px;
+    }
+
+    .hero h1 {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 900;
+      line-height: 1.15;
+      letter-spacing: -.5px;
+      color: var(--white);
+      margin-bottom: 16px;
+    }
+
+    .hero h1 span { color: var(--amber); }
+
+    .hero p {
+      font-size: 1rem;
+      color: var(--gray-300);
+      max-width: 540px;
+      margin: 0 auto;
+      line-height: 1.65;
+    }
+
+    /* ── PROGRESS BAR ───────────────────────────────── */
+    .progress-wrap {
+      margin-bottom: 36px;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .progress-label {
+      font-size: .75rem;
+      font-weight: 600;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+    }
+
+    .progress-pct {
+      font-size: .75rem;
+      font-weight: 700;
+      color: var(--amber);
+    }
+
+    .progress-track {
+      height: 6px;
+      background: var(--navy-700);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--amber-dark), var(--amber));
+      border-radius: 100px;
+      transition: width var(--transition);
+      width: 0%;
+    }
+
+    .progress-steps {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .progress-step {
+      font-size: .7rem;
+      font-weight: 500;
+      color: var(--gray-500);
+      transition: color var(--transition);
+    }
+
+    .progress-step.active { color: var(--amber); }
+    .progress-step.done   { color: var(--green); }
+
+    /* ── CARD ───────────────────────────────────────── */
+    .card {
+      background: var(--navy-800);
+      border: 1px solid var(--navy-600);
+      border-radius: var(--radius-lg);
+      padding: 40px 40px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--amber-dark), var(--amber), var(--amber-light));
+    }
+
+    @media (max-width: 540px) {
+      .card { padding: 28px 20px; }
+    }
+
+    /* ── SECTION PANELS ─────────────────────────────── */
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+      animation: fadeSlideIn var(--transition) forwards;
+    }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--amber);
+      background: rgba(245,158,11,.1);
+      border: 1px solid rgba(245,158,11,.2);
+      padding: 4px 10px;
+      border-radius: 100px;
+      margin-bottom: 20px;
+    }
+
+    .section-tag .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+    }
+
+    .section-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -.3px;
+      margin-bottom: 8px;
+    }
+
+    .section-sub {
+      font-size: .9rem;
+      color: var(--gray-400);
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    /* ── QUESTION BLOCK ─────────────────────────────── */
+    .question-block {
+      margin-bottom: 32px;
+    }
+
+    .question-block:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .question-label {
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 14px;
+      line-height: 1.5;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .q-num {
+      flex-shrink: 0;
+      width: 26px;
+      height: 26px;
+      background: rgba(245,158,11,.15);
+      border: 1px solid rgba(245,158,11,.3);
+      border-radius: 50%;
+      font-size: .75rem;
+      font-weight: 800;
+      color: var(--amber);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+
+    /* ── RADIO OPTIONS ──────────────────────────────── */
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .option {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--navy-700);
+      border: 2px solid var(--navy-600);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      cursor: pointer;
+      transition: all var(--transition);
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .option:hover {
+      border-color: rgba(245,158,11,.4);
+      background: rgba(245,158,11,.06);
+    }
+
+    .option.selected {
+      border-color: var(--amber);
+      background: rgba(245,158,11,.1);
+    }
+
+    .option input[type="radio"] { display: none; }
+
+    .radio-custom {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--navy-600);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+    }
+
+    .option:hover .radio-custom {
+      border-color: rgba(245,158,11,.5);
+    }
+
+    .option.selected .radio-custom {
+      border-color: var(--amber);
+      background: var(--amber);
+    }
+
+    .radio-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--navy);
+      opacity: 0;
+      transform: scale(0);
+      transition: all var(--transition);
+    }
+
+    .option.selected .radio-dot {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .option-letter {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      background: var(--navy-600);
+      border-radius: 6px;
+      font-size: .7rem;
+      font-weight: 800;
+      color: var(--gray-400);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+    }
+
+    .option.selected .option-letter {
+      background: rgba(245,158,11,.25);
+      color: var(--amber);
+    }
+
+    .option-text {
+      font-size: .9rem;
+      font-weight: 500;
+      color: var(--gray-300);
+      line-height: 1.4;
+      transition: color var(--transition);
+    }
+
+    .option.selected .option-text {
+      color: var(--white);
+    }
+
+    /* ── VALIDATION MESSAGE ─────────────────────────── */
+    .validation-msg {
+      font-size: .8rem;
+      color: #fb7185;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .validation-msg.visible { display: block; }
+
+    /* ── BUTTONS ────────────────────────────────────── */
+    .btn-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 36px;
+      gap: 12px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: inherit;
+      font-size: .9rem;
+      font-weight: 700;
+      padding: 14px 28px;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      transition: all var(--transition);
+      letter-spacing: -.1px;
+    }
+
+    .btn-primary {
+      background: var(--amber);
+      color: var(--navy);
+    }
+
+    .btn-primary:hover {
+      background: var(--amber-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(245,158,11,.35);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--gray-400);
+      border: 1px solid var(--navy-600);
+    }
+
+    .btn-ghost:hover {
+      color: var(--white);
+      border-color: var(--gray-400);
+    }
+
+    .btn-arrow { font-size: 1rem; }
+
+    /* ── CONTACT FORM ───────────────────────────────── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 500px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-field.full { grid-column: 1 / -1; }
+
+    .form-field label {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--gray-300);
+      letter-spacing: .02em;
+    }
+
+    .form-field label span {
+      color: var(--amber);
+      margin-left: 2px;
+    }
+
+    .form-field input,
+    .form-field select {
+      background: var(--navy-700);
+      border: 2px solid var(--navy-600);
+      border-radius: var(--radius);
+      padding: 13px 16px;
+      font-family: inherit;
+      font-size: .95rem;
+      font-weight: 500;
+      color: var(--white);
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .form-field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      padding-right: 40px;
+    }
+
+    .form-field input::placeholder { color: var(--gray-500); }
+
+    .form-field input:focus,
+    .form-field select:focus {
+      border-color: var(--amber);
+      box-shadow: 0 0 0 3px rgba(245,158,11,.12);
+    }
+
+    .form-field input.error,
+    .form-field select.error {
+      border-color: #fb7185;
+    }
+
+    .field-error {
+      font-size: .75rem;
+      color: #fb7185;
+      display: none;
+    }
+
+    .field-error.visible { display: block; }
+
+    .form-field select option {
+      background: var(--navy-800);
+      color: var(--white);
+    }
+
+    .submit-note {
+      font-size: .78rem;
+      color: var(--gray-500);
+      text-align: center;
+      margin-top: 16px;
+      line-height: 1.5;
+    }
+
+    .submit-note a { color: var(--amber); text-decoration: none; }
+
+    /* ── RESULT PAGE ────────────────────────────────── */
+    #result-panel {
+      display: none;
+    }
+
+    #result-panel.active {
+      display: block;
+      animation: fadeSlideIn var(--transition) forwards;
+    }
+
+    .result-header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .result-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 6px 16px;
+      border-radius: 100px;
+      margin-bottom: 20px;
+    }
+
+    .result-badge.green  { background: rgba(34,197,94,.12); color: #4ade80; border: 1px solid rgba(34,197,94,.25); }
+    .result-badge.yellow { background: rgba(234,179,8,.12);  color: #facc15; border: 1px solid rgba(234,179,8,.25); }
+    .result-badge.orange { background: rgba(249,115,22,.12); color: #fb923c; border: 1px solid rgba(249,115,22,.25); }
+    .result-badge.red    { background: rgba(239,68,68,.12);  color: #f87171; border: 1px solid rgba(239,68,68,.25); }
+
+    .result-tier {
+      font-size: clamp(1.4rem, 3.5vw, 2rem);
+      font-weight: 900;
+      letter-spacing: -.4px;
+      line-height: 1.2;
+      margin-bottom: 8px;
+    }
+
+    .result-score-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+
+    .result-score-label {
+      font-size: .85rem;
+      color: var(--gray-400);
+    }
+
+    .result-score-val {
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: var(--amber);
+      line-height: 1;
+    }
+
+    .result-score-max {
+      font-size: .95rem;
+      color: var(--gray-500);
+      font-weight: 600;
+    }
+
+    /* ── LEAK METER ─────────────────────────────────── */
+    .leak-meter {
+      background: var(--navy-700);
+      border: 1px solid var(--navy-600);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      margin-bottom: 28px;
+    }
+
+    .leak-meter-label {
+      font-size: .8rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .leak-meter-track {
+      height: 20px;
+      background: var(--navy);
+      border-radius: 100px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .leak-meter-fill {
+      height: 100%;
+      border-radius: 100px;
+      transition: width 1.2s cubic-bezier(.4,0,.2,1) .3s;
+      position: relative;
+    }
+
+    .leak-meter-fill::after {
+      content: '';
+      position: absolute;
+      top: 0; right: 0; bottom: 0;
+      width: 40px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.2));
+      border-radius: 100px;
+    }
+
+    .leak-meter-fill.green  { background: linear-gradient(90deg, #16a34a, var(--green)); }
+    .leak-meter-fill.yellow { background: linear-gradient(90deg, #ca8a04, var(--yellow)); }
+    .leak-meter-fill.orange { background: linear-gradient(90deg, #ea580c, var(--orange)); }
+    .leak-meter-fill.red    { background: linear-gradient(90deg, #dc2626, var(--red)); }
+
+    .leak-meter-ticks {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 2px;
+    }
+
+    .leak-tick {
+      font-size: .68rem;
+      color: var(--gray-500);
+    }
+
+    .leak-tick.current {
+      font-weight: 700;
+      color: var(--amber);
+    }
+
+    /* ── RESULT MESSAGE BOX ─────────────────────────── */
+    .result-message {
+      background: var(--navy-700);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      margin-bottom: 28px;
+      line-height: 1.7;
+      font-size: .95rem;
+      color: var(--gray-200);
+      border-left: 4px solid var(--amber);
+    }
+
+    /* ── RESULT FOOTER ──────────────────────────────── */
+    .result-footer {
+      background: rgba(245,158,11,.06);
+      border: 1px solid rgba(245,158,11,.15);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      text-align: center;
+    }
+
+    .result-footer-icon {
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+    }
+
+    .result-footer p {
+      font-size: .9rem;
+      color: var(--gray-300);
+      line-height: 1.6;
+    }
+
+    .result-footer strong {
+      color: var(--amber);
+    }
+
+    .result-footer .domain {
+      display: inline-block;
+      margin-top: 10px;
+      font-size: .8rem;
+      color: var(--gray-500);
+    }
+
+    /* ── DIVIDER ────────────────────────────────────── */
+    .section-divider {
+      height: 1px;
+      background: var(--navy-600);
+      margin: 28px 0;
+    }
+
+    /* ── TRUST STRIP ────────────────────────────────── */
+    .trust-strip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 24px;
+      flex-wrap: wrap;
+    }
+
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .75rem;
+      color: var(--gray-500);
+    }
+
+    .trust-icon {
+      font-size: .9rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── HEADER ── -->
+  <header class="site-header">
+    <a href="#" class="logo">
+      <div class="logo-icon">⚙</div>
+      <span class="logo-text">Shop<span>Command</span></span>
+    </a>
+    <span class="header-badge">Free Audit Tool</span>
+  </header>
+
+  <!-- ── MAIN ── -->
+  <main class="wrapper">
+
+    <!-- HERO -->
+    <div class="hero">
+      <span class="hero-eyebrow">ShopCommand Leaky Bucket Audit</span>
+      <h1>Find Out How Many Jobs<br />Your Shop Is <span>Losing Every Week</span></h1>
+      <p>Answer 10 quick questions and we'll show you exactly where revenue is slipping through the cracks — and what to do about it.</p>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="progress-wrap" id="progress-wrap">
+      <div class="progress-meta">
+        <span class="progress-label" id="progress-section-label">Section 1 of 4</span>
+        <span class="progress-pct" id="progress-pct">0% Complete</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="progress-steps">
+        <span class="progress-step active" id="step-1">Opportunities</span>
+        <span class="progress-step" id="step-2">Follow-Up</span>
+        <span class="progress-step" id="step-3">Time & Capacity</span>
+        <span class="progress-step" id="step-4">Contact Info</span>
+      </div>
+    </div>
+
+    <!-- CARD -->
+    <div class="card" id="main-card">
+
+      <!-- ══ SECTION 1 ══ -->
+      <div class="panel active" id="section-1">
+        <div class="section-tag"><span class="dot"></span>Section 1 of 4</div>
+        <div class="section-title">Your Incoming Opportunities</div>
+        <div class="section-sub">Let's look at how your shop handles inbound calls and quote requests.</div>
+
+        <!-- Q1 -->
+        <div class="question-block" id="qblock-1">
+          <div class="question-label">
+            <span class="q-num">1</span>
+            <span>When a customer calls and you're busy, what happens?</span>
+          </div>
+          <div class="options" role="radiogroup" aria-label="Question 1">
+            <label class="option" data-q="1" data-val="1">
+              <input type="radio" name="q1" value="1" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">A</span>
+              <span class="option-text">We call them back the same day</span>
+            </label>
+            <label class="option" data-q="1" data-val="2">
+              <input type="radio" name="q1" value="2" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">B</span>
+              <span class="option-text">We try to call back but sometimes miss it</span>
+            </label>
+            <label class="option" data-q="1" data-val="3">
+              <input type="radio" name="q1" value="3" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">C</span>
+              <span class="option-text">Honestly, it depends on who answers</span>
+            </label>
+            <label class="option" data-q="1" data-val="4">
+              <input type="radio" name="q1" value="4" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">D</span>
+              <span class="option-text">We don't have a consistent process</span>
+            </label>
+          </div>
+          <div class="validation-msg" id="val-1">Please select an answer to continue.</div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Q2 -->
+        <div class="question-block" id="qblock-2">
+          <div class="question-label">
+            <span class="q-num">2</span>
+            <span>How do you track customers who called but never booked?</span>
+          </div>
+          <div class="options" role="radiogroup" aria-label="Question 2">
+            <label class="option" data-q="2" data-val="1">
+              <input type="radio" name="q2" value="1" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">A</span>
+              <span class="option-text">We have a system for that</span>
+            </label>
+            <label class="option" data-q="2" data-val="2">
+              <input type="radio" name="q2" value="2" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">B</span>
+              <span class="option-text">We write it down somewhere</span>
+            </label>
+            <label class="option" data-q="2" data-val="3">
+              <input type="radio" name="q2" value="3" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">C</span>
+              <span class="option-text">We try to remember</span>
+            </label>
+            <label class="option" data-q="2" data-val="4">
+              <input type="radio" name="q2" value="4" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">D</span>
+              <span class="option-text">We don't track that</span>
+            </label>
+          </div>
+          <div class="validation-msg" id="val-2">Please select an answer to continue.</div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Q3 -->
+        <div class="question-block" id="qblock-3">
+          <div class="question-label">
+            <span class="q-num">3</span>
+            <span>How many calls or inquiries do you think your shop gets in a week that never turn into a booked job?</span>
+          </div>
+          <div class="options" role="radiogroup" aria-label="Question 3">
+            <label class="option" data-q="3" data-val="1">
+              <input type="radio" name="q3" value="1" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">A</span>
+              <span class="option-text">Less than 5</span>
+            </label>
+            <label class="option" data-q="3" data-val="2">
+              <input type="radio" name="q3" value="2" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">B</span>
+              <span class="option-text">5–10</span>
+            </label>
+            <label class="option" data-q="3" data-val="3">
+              <input type="radio" name="q3" value="3" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">C</span>
+              <span class="option-text">10–20</span>
+            </label>
+            <label class="option" data-q="3" data-val="4">
+              <input type="radio" name="q3" value="4" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">D</span>
+              <span class="option-text">Honestly, I have no idea</span>
+            </label>
+          </div>
+          <div class="validation-msg" id="val-3">Please select an answer to continue.</div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Q4 -->
+        <div class="question-block" id="qblock-4">
+          <div class="question-label">
+            <span class="q-num">4</span>
+            <span>When someone requests a quote, how quickly do you follow up?</span>
+          </div>
+          <div class="options" role="radiogroup" aria-label="Question 4">
+            <label class="option" data-q="4" data-val="1">
+              <input type="radio" name="q4" value="1" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">A</span>
+              <span class="option-text">Within the hour</span>
+            </label>
+            <label class="option" data-q="4" data-val="2">
+              <input type="radio" name="q4" value="2" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">B</span>
+              <span class="option-text">Same day</span>
+            </label>
+            <label class="option" data-q="4" data-val="3">
+              <input type="radio" name="q4" value="3" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">C</span>
+              <span class="option-text">Within a few days</span>
+            </label>
+            <label class="option" data-q="4" data-val="4">
+              <input type="radio" name="q4" value="4" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">D</span>
+              <span class="option-text">When we get around to it</span>
+            </label>
+          </div>
+          <div class="validation-msg" id="val-4">Please select an answer to continue.</div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="nextSection(1)">
+            Next: Follow-Up Process <span class="btn-arrow">→</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ══ SECTION 2 ══ -->
+      <div class="panel" id="section-2">
+        <div class="section-tag"><span class="dot"></span>Section 2 of 4</div>
+        <div class="section-title">Your Follow-Up Process</div>
+        <div class="section-sub">How your shop handles estimates and in-progress communication makes a big difference.</div>
+
+        <!-- Q5 -->
+        <div class="question-block" id="qblock-5">
+          <div class="question-label">
+            <span class="q-num">5</span>
+            <span>After giving a quote, how many times do you follow up if they don't respond?</span>
+          </div>
+          <div class="options" role="radiogroup" aria-label="Question 5">
+            <label class="option" data-q="5" data-val="1">
+              <input type="radio" name="q5" value="1" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">A</span>
+              <span class="option-text">2 or more times</span>
+            </label>
+            <label class="option" data-q="5" data-val="2">
+              <input type="radio" name="q5" value="2" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">B</span>
+              <span class="option-text">Once</span>
+            </label>
+            <label class="option" data-q="5" data-val="3">
+              <input type="radio" name="q5" value="3" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">C</span>
+              <span class="option-text">We wait for them to call back</span>
+            </label>
+            <label class="option" data-q="5" data-val="4">
+              <input type="radio" name="q5" value="4" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">D</span>
+              <span class="option-text">We don't follow up</span>
+            </label>
+          </div>
+          <div class="validation-msg" id="val-5">Please select an answer to continue.</div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Q6 -->
+        <div class="question-block" id="qblock-6">
+          <div class="question-label">
+            <span class="q-num">6</span>
+            <span>Do you have an automated system to follow up with unsold estimates?</span>
+          </div>
+          <div class="options" role="radiogroup" aria-label="Question 6">
+            <label class="option" data-q="6" data-val="1">
+              <input type="radio" name="q6" value="1" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">A</span>
+              <span class="option-text">Yes, it's fully automated</span>
+            </label>
+            <label class="option" data-q="6" data-val="2">
+              <input type="radio" name="q6" value="2" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">B</span>
+              <span class="option-text">We do it manually</span>
+            </label>
+            <label class="option" data-q="6" data-val="3">
+              <input type="radio" name="q6" value="3" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">C</span>
+              <span class="option-text">We mean to but it doesn't always happen</span>
+            </label>
+            <label class="option" data-q="6" data-val="4">
+              <input type="radio" name="q6" value="4" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">D</span>
+              <span class="option-text">No system at all</span>
+            </label>
+          </div>
+          <div class="validation-msg" id="val-6">Please select an answer to continue.</div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Q7 -->
+        <div class="question-block" id="qblock-7">
+          <div class="question-label">
+            <span class="q-num">7</span>
+            <span>How do you communicate with customers once their vehicle is in the shop?</span>
+          </div>
+          <div class="options" role="radiogroup" aria-label="Question 7">
+            <label class="option" data-q="7" data-val="1">
+              <input type="radio" name="q7" value="1" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">A</span>
+              <span class="option-text">Automated text/email updates</span>
+            </label>
+            <label class="option" data-q="7" data-val="2">
+              <input type="radio" name="q7" value="2" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">B</span>
+              <span class="option-text">We call them manually</span>
+            </label>
+            <label class="option" data-q="7" data-val="3">
+              <input type="radio" name="q7" value="3" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">C</span>
+              <span class="option-text">They call us to check in</span>
+            </label>
+            <label class="option" data-q="7" data-val="4">
+              <input type="radio" name="q7" value="4" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">D</span>
+              <span class="option-text">It varies</span>
+            </label>
+          </div>
+          <div class="validation-msg" id="val-7">Please select an answer to continue.</div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="prevSection(2)">← Back</button>
+          <button class="btn btn-primary" onclick="nextSection(2)">
+            Next: Time & Capacity <span class="btn-arrow">→</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ══ SECTION 3 ══ -->
+      <div class="panel" id="section-3">
+        <div class="section-tag"><span class="dot"></span>Section 3 of 4</div>
+        <div class="section-title">Your Time & Capacity</div>
+        <div class="section-sub">Understanding where your team's hours actually go reveals your biggest opportunity.</div>
+
+        <!-- Q8 -->
+        <div class="question-block" id="qblock-8">
+          <div class="question-label">
+            <span class="q-num">8</span>
+            <span>How many hours per week does your team spend on calls, follow-ups, and customer communication?</span>
+          </div>
+          <div class="options" role="radiogroup" aria-label="Question 8">
+            <label class="option" data-q="8" data-val="1">
+              <input type="radio" name="q8" value="1" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">A</span>
+              <span class="option-text">Less than 5 hours</span>
+            </label>
+            <label class="option" data-q="8" data-val="2">
+              <input type="radio" name="q8" value="2" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">B</span>
+              <span class="option-text">5–10 hours</span>
+            </label>
+            <label class="option" data-q="8" data-val="3">
+              <input type="radio" name="q8" value="3" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">C</span>
+              <span class="option-text">10–20 hours</span>
+            </label>
+            <label class="option" data-q="8" data-val="4">
+              <input type="radio" name="q8" value="4" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">D</span>
+              <span class="option-text">More than 20 hours</span>
+            </label>
+          </div>
+          <div class="validation-msg" id="val-8">Please select an answer to continue.</div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Q9 -->
+        <div class="question-block" id="qblock-9">
+          <div class="question-label">
+            <span class="q-num">9</span>
+            <span>Have you ever lost a job you know you should have closed?</span>
+          </div>
+          <div class="options" role="radiogroup" aria-label="Question 9">
+            <label class="option" data-q="9" data-val="1">
+              <input type="radio" name="q9" value="1" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">A</span>
+              <span class="option-text">Rarely</span>
+            </label>
+            <label class="option" data-q="9" data-val="2">
+              <input type="radio" name="q9" value="2" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">B</span>
+              <span class="option-text">Occasionally</span>
+            </label>
+            <label class="option" data-q="9" data-val="3">
+              <input type="radio" name="q9" value="3" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">C</span>
+              <span class="option-text">More than I'd like to admit</span>
+            </label>
+            <label class="option" data-q="9" data-val="4">
+              <input type="radio" name="q9" value="4" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">D</span>
+              <span class="option-text">Regularly</span>
+            </label>
+          </div>
+          <div class="validation-msg" id="val-9">Please select an answer to continue.</div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <!-- Q10 -->
+        <div class="question-block" id="qblock-10">
+          <div class="question-label">
+            <span class="q-num">10</span>
+            <span>If your shop captured just 2–3 more jobs per week from people already reaching out, what would that mean for your revenue?</span>
+          </div>
+          <div class="options" role="radiogroup" aria-label="Question 10">
+            <label class="option" data-q="10" data-val="1">
+              <input type="radio" name="q10" value="1" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">A</span>
+              <span class="option-text">$2,000–$5,000/month</span>
+            </label>
+            <label class="option" data-q="10" data-val="2">
+              <input type="radio" name="q10" value="2" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">B</span>
+              <span class="option-text">$5,000–$10,000/month</span>
+            </label>
+            <label class="option" data-q="10" data-val="3">
+              <input type="radio" name="q10" value="3" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">C</span>
+              <span class="option-text">$10,000+/month</span>
+            </label>
+            <label class="option" data-q="10" data-val="4">
+              <input type="radio" name="q10" value="4" />
+              <div class="radio-custom"><div class="radio-dot"></div></div>
+              <span class="option-letter">D</span>
+              <span class="option-text">I've never calculated it</span>
+            </label>
+          </div>
+          <div class="validation-msg" id="val-10">Please select an answer to continue.</div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="prevSection(3)">← Back</button>
+          <button class="btn btn-primary" onclick="nextSection(3)">
+            Last Step: Contact Info <span class="btn-arrow">→</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ══ SECTION 4 ══ -->
+      <div class="panel" id="section-4">
+        <div class="section-tag"><span class="dot"></span>Section 4 of 4</div>
+        <div class="section-title">Almost Done — Where Should We Send Your Results?</div>
+        <div class="section-sub">A ShopCommand specialist will personally review your audit and reach out within 24 hours.</div>
+
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="firstName">First Name <span>*</span></label>
+            <input type="text" id="firstName" placeholder="Your first name" autocomplete="given-name" />
+            <span class="field-error" id="err-firstName">Please enter your first name.</span>
+          </div>
+          <div class="form-field">
+            <label for="shopName">Shop Name <span>*</span></label>
+            <input type="text" id="shopName" placeholder="Your shop name" />
+            <span class="field-error" id="err-shopName">Please enter your shop name.</span>
+          </div>
+          <div class="form-field">
+            <label for="phone">Phone Number <span>*</span></label>
+            <input type="tel" id="phone" placeholder="(555) 000-0000" autocomplete="tel" />
+            <span class="field-error" id="err-phone">Please enter a valid phone number.</span>
+          </div>
+          <div class="form-field">
+            <label for="email">Email Address <span>*</span></label>
+            <input type="email" id="email" placeholder="you@yourshop.com" autocomplete="email" />
+            <span class="field-error" id="err-email">Please enter a valid email address.</span>
+          </div>
+          <div class="form-field full">
+            <label for="bestTime">Best Time to Reach You <span>*</span></label>
+            <select id="bestTime">
+              <option value="" disabled selected>Select a time...</option>
+              <option value="Morning">Morning (8am – 12pm)</option>
+              <option value="Afternoon">Afternoon (12pm – 5pm)</option>
+              <option value="Evening">Evening (5pm – 8pm)</option>
+            </select>
+            <span class="field-error" id="err-bestTime">Please select a preferred time.</span>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="prevSection(4)">← Back</button>
+          <button class="btn btn-primary" onclick="submitAudit()" id="submit-btn" style="padding:14px 32px; font-size:.95rem;">
+            Show Me Where We're Leaking Jobs →
+          </button>
+        </div>
+
+        <p class="submit-note">
+          No spam. Ever. We'll reach out once with your personalized breakdown — that's it.<br />
+          Questions? Visit <a href="https://automateSouth.com" target="_blank">automateSouth.com</a>
+        </p>
+
+        <div class="trust-strip">
+          <div class="trust-item"><span class="trust-icon">🔒</span> 100% Private</div>
+          <div class="trust-item"><span class="trust-icon">⚡</span> Results in Seconds</div>
+          <div class="trust-item"><span class="trust-icon">📞</span> Human Follow-Up in 24hrs</div>
+        </div>
+      </div>
+
+    </div><!-- /card -->
+
+    <!-- ══ RESULT PANEL ══ -->
+    <div class="card" id="result-panel">
+      <div class="result-header">
+        <div class="result-badge" id="result-badge">Audit Complete</div>
+        <div class="result-tier" id="result-tier"></div>
+        <div class="result-score-row">
+          <span class="result-score-label">Your Score:</span>
+          <span class="result-score-val" id="result-score-val">—</span>
+          <span class="result-score-max">/ 40</span>
+        </div>
+      </div>
+
+      <div class="leak-meter">
+        <div class="leak-meter-label">
+          <span>Opportunity Leak Meter</span>
+          <span id="leak-pct-label">—</span>
+        </div>
+        <div class="leak-meter-track">
+          <div class="leak-meter-fill" id="leak-fill" style="width: 0%"></div>
+        </div>
+        <div class="leak-meter-ticks">
+          <span class="leak-tick">Tight</span>
+          <span class="leak-tick">Moderate</span>
+          <span class="leak-tick">Significant</span>
+          <span class="leak-tick">Critical</span>
+        </div>
+      </div>
+
+      <div class="result-message" id="result-message"></div>
+
+      <div class="result-footer">
+        <div class="result-footer-icon">📋</div>
+        <p>
+          <strong>A ShopCommand specialist will personally review your audit and reach out within 24 hours.</strong><br />
+          They'll walk you through your specific gaps and what it would take to close them — no pressure, just clarity.
+        </p>
+        <a href="https://automateSouth.com" target="_blank" class="domain">automateSouth.com</a>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // ── STATE ──────────────────────────────────────────
+    const answers = {};
+    let currentSection = 1;
+    const totalSections = 4;
+
+    // ── OPTION CLICK HANDLER ───────────────────────────
+    document.querySelectorAll('.option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        const q = opt.dataset.q;
+        const val = parseInt(opt.dataset.val, 10);
+
+        // Deselect siblings
+        document.querySelectorAll(`.option[data-q="${q}"]`).forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+        opt.querySelector('input[type="radio"]').checked = true;
+
+        answers[`q${q}`] = val;
+
+        // Hide validation message if shown
+        const vMsg = document.getElementById(`val-${q}`);
+        if (vMsg) vMsg.classList.remove('visible');
+      });
+    });
+
+    // ── PROGRESS HELPERS ───────────────────────────────
+    const progressFill  = document.getElementById('progress-fill');
+    const progressPct   = document.getElementById('progress-pct');
+    const progressLabel = document.getElementById('progress-section-label');
+
+    function updateProgress(section) {
+      // 4 sections + results = 5 states; progress fills on question sections only
+      const pct = Math.round(((section - 1) / totalSections) * 100);
+      progressFill.style.width = pct + '%';
+      progressPct.textContent  = pct + '% Complete';
+      progressLabel.textContent = `Section ${Math.min(section, totalSections)} of ${totalSections}`;
+
+      for (let i = 1; i <= totalSections; i++) {
+        const el = document.getElementById(`step-${i}`);
+        if (!el) continue;
+        el.classList.remove('active', 'done');
+        if (i < section)      el.classList.add('done');
+        else if (i === section) el.classList.add('active');
+      }
+    }
+
+    // ── SECTION QUESTIONS MAP ──────────────────────────
+    const sectionQuestions = {
+      1: [1, 2, 3, 4],
+      2: [5, 6, 7],
+      3: [8, 9, 10],
+    };
+
+    // ── VALIDATE SECTION ──────────────────────────────
+    function validateSection(section) {
+      if (!sectionQuestions[section]) return true; // contact section handled separately
+      let valid = true;
+      sectionQuestions[section].forEach(q => {
+        if (!answers[`q${q}`]) {
+          document.getElementById(`val-${q}`).classList.add('visible');
+          valid = false;
+        }
+      });
+      if (!valid) {
+        // Scroll to first unanswered
+        const firstUnanswered = sectionQuestions[section].find(q => !answers[`q${q}`]);
+        if (firstUnanswered) {
+          document.getElementById(`qblock-${firstUnanswered}`).scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+      return valid;
+    }
+
+    // ── NAVIGATION ────────────────────────────────────
+    function nextSection(from) {
+      if (!validateSection(from)) return;
+
+      document.getElementById(`section-${from}`).classList.remove('active');
+      const next = from + 1;
+      document.getElementById(`section-${next}`).classList.add('active');
+      currentSection = next;
+      updateProgress(next);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function prevSection(from) {
+      document.getElementById(`section-${from}`).classList.remove('active');
+      const prev = from - 1;
+      document.getElementById(`section-${prev}`).classList.add('active');
+      currentSection = prev;
+      updateProgress(prev);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── CONTACT VALIDATION ─────────────────────────────
+    function validateContact() {
+      let valid = true;
+
+      const fields = [
+        { id: 'firstName',  errId: 'err-firstName', check: v => v.trim().length >= 1 },
+        { id: 'shopName',   errId: 'err-shopName',  check: v => v.trim().length >= 1 },
+        { id: 'phone',      errId: 'err-phone',     check: v => v.replace(/\D/g,'').length >= 7 },
+        { id: 'email',      errId: 'err-email',     check: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
+        { id: 'bestTime',   errId: 'err-bestTime',  check: v => v !== '' },
+      ];
+
+      fields.forEach(f => {
+        const el  = document.getElementById(f.id);
+        const err = document.getElementById(f.errId);
+        const ok  = f.check(el.value);
+        if (!ok) {
+          el.classList.add('error');
+          err.classList.add('visible');
+          valid = false;
+        } else {
+          el.classList.remove('error');
+          err.classList.remove('visible');
+        }
+      });
+
+      return valid;
+    }
+
+    // ── SCORING ENGINE ─────────────────────────────────
+    function calcScore() {
+      let total = 0;
+      for (let i = 1; i <= 10; i++) {
+        total += (answers[`q${i}`] || 0);
+      }
+      return total;
+    }
+
+    const tiers = [
+      {
+        min: 10, max: 16,
+        color: 'green',
+        label: 'Tier 1 — Solid Operator',
+        title: 'Your Shop Is Running Tight',
+        message: "You've got solid systems in place. There may still be some gaps worth tightening — we'll review your answers and reach out with specific feedback within 24 hours.",
+        leakPct: 22,
+      },
+      {
+        min: 17, max: 24,
+        color: 'yellow',
+        label: 'Tier 2 — Room to Improve',
+        title: 'You\'re Leaving Some Jobs on the Table',
+        message: "Your shop has real opportunity being missed right now. Based on your answers, you're likely losing 3–5 jobs per week that you were already called about. We'll reach out within 24 hours with a personalized breakdown.",
+        leakPct: 50,
+      },
+      {
+        min: 25, max: 32,
+        color: 'orange',
+        label: 'Tier 3 — Significant Leak',
+        title: 'Your Shop Has a Significant Leak',
+        message: "Based on your answers, your shop is likely losing 5–10+ jobs every week — not from lack of calls, but from lack of follow-up. One shop just like yours saved 75 calls per week and 5–10 hours of staff time after plugging these exact leaks. We'll reach out within 24 hours.",
+        leakPct: 75,
+      },
+      {
+        min: 33, max: 40,
+        color: 'red',
+        label: 'Tier 4 — Critical',
+        title: 'Your Shop Is Hemorrhaging Opportunities',
+        message: "Your shop is almost certainly losing $10,000–$20,000+ in potential revenue every month from missed follow-ups and dropped inquiries. The good news: this is completely fixable. We'll reach out within 24 hours with a custom plan.",
+        leakPct: 95,
+      },
+    ];
+
+    function getTier(score) {
+      return tiers.find(t => score >= t.min && score <= t.max) || tiers[tiers.length - 1];
+    }
+
+    // ── GHL WEBHOOK ───────────────────────────────────
+    async function submitToGHL(auditData) {
+      const webhookURL = "PASTE_YOUR_GHL_WEBHOOK_URL_HERE";
+      if (webhookURL === "PASTE_YOUR_GHL_WEBHOOK_URL_HERE") return; // skip until URL is set
+
+      const payload = {
+        firstName:  auditData.contact.firstName,
+        shopName:   auditData.contact.shopName,
+        phone:      auditData.contact.phone,
+        email:      auditData.contact.email,
+        bestTime:   auditData.contact.bestTime,
+        auditScore: auditData.score,
+        auditTier:  auditData.tier,
+        answers:    auditData.answers,
+        source:     "ShopCommand Leaky Bucket Audit",
+      };
+
+      try {
+        await fetch(webhookURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        console.log("Lead sent to GHL successfully");
+      } catch (error) {
+        console.error("GHL webhook error:", error);
+      }
+    }
+
+    // ── SUBMIT ────────────────────────────────────────
+    async function submitAudit() {
+      if (!validateContact()) {
+        document.getElementById('firstName').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+
+      const score = calcScore();
+      const tier  = getTier(score);
+
+      const auditData = {
+        contact: {
+          firstName: document.getElementById('firstName').value.trim(),
+          shopName:  document.getElementById('shopName').value.trim(),
+          phone:     document.getElementById('phone').value.trim(),
+          email:     document.getElementById('email').value.trim(),
+          bestTime:  document.getElementById('bestTime').value,
+        },
+        answers,
+        score,
+        tier: tier.title,
+        tierColor: tier.color,
+        submittedAt: new Date().toISOString(),
+      };
+
+      console.log('=== ShopCommand Leaky Bucket Audit Submission ===');
+      console.log(JSON.stringify(auditData, null, 2));
+
+      await submitToGHL(auditData);
+      showResults(score, tier);
+    }
+
+    // ── SHOW RESULTS ──────────────────────────────────
+    function showResults(score, tier) {
+      // Hide form
+      document.getElementById('main-card').style.display    = 'none';
+      document.getElementById('progress-wrap').style.display = 'none';
+
+      // Build result UI
+      const badge   = document.getElementById('result-badge');
+      const tierEl  = document.getElementById('result-tier');
+      const scoreEl = document.getElementById('result-score-val');
+      const msgEl   = document.getElementById('result-message');
+      const fillEl  = document.getElementById('leak-fill');
+      const pctLbl  = document.getElementById('leak-pct-label');
+
+      badge.className  = `result-badge ${tier.color}`;
+      badge.textContent = tier.label;
+      tierEl.textContent = tier.title;
+      scoreEl.textContent = score;
+      msgEl.textContent   = tier.message;
+      pctLbl.textContent  = `${tier.leakPct}% leaking`;
+
+      // Color fill class
+      fillEl.className = `leak-meter-fill ${tier.color}`;
+
+      // Show result panel
+      const resultPanel = document.getElementById('result-panel');
+      resultPanel.style.display = 'block';
+      resultPanel.classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Animate fill bar after render
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          fillEl.style.width = tier.leakPct + '%';
+        });
+      });
+    }
+
+    // ── INIT ──────────────────────────────────────────
+    updateProgress(1);
+  </script>
+</body>
+</html>
