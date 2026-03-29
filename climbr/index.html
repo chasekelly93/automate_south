@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<!--
+  Climbr — Pipeline Visibility Audit
+  Deploy: rename to index.html on a dedicated Netlify site, or drop in /public/index.html
+  GHL:    set CLIMBR_WEBHOOK_URL below to your GHL workflow webhook URL
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Climbr — Pipeline Visibility Audit</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --teal:         #1D9E75;
+      --teal-dark:    #178f67;
+      --teal-light:   rgba(29, 158, 117, 0.08);
+      --teal-border:  rgba(29, 158, 117, 0.25);
+      --red:          #EF4444;
+      --amber:        #F59E0B;
+      --green:        #22C55E;
+      --white:        #ffffff;
+      --bg:           #f9fafb;
+      --text:         #111827;
+      --text-2:       #374151;
+      --text-muted:   #6B7280;
+      --text-light:   #9CA3AF;
+      --border:       #E5E7EB;
+      --border-md:    #D1D5DB;
+      --radius:       12px;
+      --radius-sm:    8px;
+      --shadow-sm:    0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+      --shadow-md:    0 4px 12px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.05);
+      --transition:   .18s ease;
+    }
+
+    html { font-size: 16px; scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── HEADER ─────────────────────────────────────── */
+    .site-header {
+      width: 100%;
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo-wordmark {
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: var(--teal);
+      letter-spacing: -0.5px;
+    }
+
+    .header-badge {
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--teal);
+      background: var(--teal-light);
+      border: 1px solid var(--teal-border);
+      padding: 4px 10px;
+      border-radius: 100px;
+    }
+
+    /* ── WRAPPER ────────────────────────────────────── */
+    .wrapper {
+      width: 100%;
+      max-width: 640px;
+      padding: 36px 20px 80px;
+    }
+
+    /* ── PROGRESS BAR ───────────────────────────────── */
+    .progress-bar-wrap {
+      margin-bottom: 24px;
+    }
+
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+    }
+
+    .progress-label {
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .progress-pct {
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--teal);
+    }
+
+    .progress-track {
+      height: 6px;
+      background: var(--border);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--teal);
+      border-radius: 100px;
+      transition: width .4s ease;
+    }
+
+    /* ── CARD ───────────────────────────────────────── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px;
+      box-shadow: var(--shadow-md);
+    }
+
+    @media (max-width: 500px) {
+      .card { padding: 24px 20px; border-radius: 12px; }
+    }
+
+    /* ── SCREENS ────────────────────────────────────── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── INTRO ──────────────────────────────────────── */
+    .intro-logo {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: var(--teal);
+      margin-bottom: 24px;
+      letter-spacing: -0.5px;
+    }
+
+    .intro-headline {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.2;
+      margin-bottom: 16px;
+      letter-spacing: -0.5px;
+    }
+
+    @media (max-width: 500px) {
+      .intro-headline { font-size: 1.45rem; }
+    }
+
+    .intro-subhead {
+      font-size: .97rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+      margin-bottom: 28px;
+    }
+
+    .audit-meta {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+
+    .audit-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .82rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .meta-icon {
+      color: var(--teal);
+      flex-shrink: 0;
+    }
+
+    /* ── BUTTONS ────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+      font-size: .95rem;
+      font-weight: 700;
+      padding: 14px 28px;
+      border-radius: var(--radius);
+      border: none;
+      cursor: pointer;
+      transition: all var(--transition);
+      letter-spacing: -.1px;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--teal);
+      color: var(--white);
+      width: 100%;
+    }
+
+    .btn-primary:hover {
+      background: var(--teal-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(29,158,117,.28);
+    }
+
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-primary:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 13px 18px;
+      font-size: .88rem;
+    }
+
+    .btn-ghost:hover {
+      color: var(--text);
+      border-color: var(--border-md);
+      background: var(--bg);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 28px;
+      align-items: center;
+    }
+
+    .btn-row .btn-primary { flex: 1; }
+
+    /* ── QUESTION SCREEN ────────────────────────────── */
+    .q-number {
+      font-size: .73rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 12px;
+    }
+
+    .q-text {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.4;
+      margin-bottom: 22px;
+    }
+
+    @media (max-width: 500px) {
+      .q-text { font-size: 1rem; }
+    }
+
+    /* ── ANSWER OPTIONS ─────────────────────────────── */
+    .options {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .option {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 13px 15px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition);
+      background: var(--white);
+      user-select: none;
+    }
+
+    .option:hover {
+      border-color: var(--teal-border);
+      background: var(--teal-light);
+    }
+
+    .option.selected {
+      border-color: var(--teal);
+      background: var(--teal-light);
+    }
+
+    .option input[type="radio"] { display: none; }
+
+    .option-radio {
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--border-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+      transition: all var(--transition);
+    }
+
+    .option.selected .option-radio {
+      border-color: var(--teal);
+      background: var(--teal);
+    }
+
+    .option-radio-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--white);
+      opacity: 0;
+      transform: scale(0);
+      transition: all var(--transition);
+    }
+
+    .option.selected .option-radio-dot {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .option-letter {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: var(--bg);
+      font-size: .7rem;
+      font-weight: 800;
+      color: var(--text-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+    }
+
+    .option.selected .option-letter {
+      background: rgba(29,158,117,.15);
+      color: var(--teal);
+    }
+
+    .option-text {
+      font-size: .88rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      line-height: 1.45;
+      transition: color var(--transition);
+    }
+
+    .option.selected .option-text {
+      color: var(--text-2);
+    }
+
+    /* ── EMAIL GATE ─────────────────────────────────── */
+    .gate-headline {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+      letter-spacing: -.3px;
+    }
+
+    .gate-subhead {
+      font-size: .9rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-bottom: 26px;
+    }
+
+    .gate-score-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: var(--teal-light);
+      border: 1px solid var(--teal-border);
+      border-radius: var(--radius-sm);
+      margin-bottom: 24px;
+    }
+
+    .gate-score-icon {
+      font-size: 1.2rem;
+    }
+
+    .gate-score-text {
+      font-size: .83rem;
+      color: var(--teal);
+      font-weight: 600;
+    }
+
+    /* Form */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 500px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .form-field.full { grid-column: 1 / -1; }
+
+    .form-field label {
+      font-size: .78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .form-field label .req { color: var(--red); }
+    .form-field label .opt { color: var(--text-light); font-weight: 400; }
+
+    .form-field input {
+      font-family: inherit;
+      font-size: .9rem;
+      padding: 11px 13px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      background: var(--white);
+      transition: border-color var(--transition);
+      outline: none;
+    }
+
+    .form-field input::placeholder { color: var(--text-light); }
+    .form-field input:focus { border-color: var(--teal); }
+    .form-field input.error { border-color: var(--red); }
+
+    .field-error {
+      font-size: .73rem;
+      color: var(--red);
+      display: none;
+    }
+
+    .field-error.visible { display: block; }
+
+    .submit-note {
+      font-size: .75rem;
+      color: var(--text-light);
+      text-align: center;
+      margin-top: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── LOADING ────────────────────────────────────── */
+    .loading-wrap {
+      text-align: center;
+      padding: 48px 0;
+    }
+
+    .loading-spinner {
+      width: 44px;
+      height: 44px;
+      border: 3px solid var(--border);
+      border-top-color: var(--teal);
+      border-radius: 50%;
+      animation: spin .75s linear infinite;
+      margin: 0 auto 18px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-text {
+      font-size: .95rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    /* ── RESULTS ────────────────────────────────────── */
+    .results-eyebrow {
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-bottom: 8px;
+    }
+
+    .results-headline {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.25;
+      margin-bottom: 22px;
+      letter-spacing: -.3px;
+    }
+
+    /* Score meter */
+    .score-meter {
+      margin-bottom: 22px;
+    }
+
+    .score-meter-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .score-meter-label {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .score-meter-val {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: var(--text);
+      letter-spacing: -0.5px;
+    }
+
+    .score-meter-track {
+      height: 12px;
+      background: var(--bg);
+      border-radius: 100px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .score-meter-fill {
+      height: 100%;
+      border-radius: 100px;
+      transition: width .9s cubic-bezier(.25,.46,.45,.94);
+    }
+
+    /* Summary */
+    .results-summary {
+      font-size: .9rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+      padding: 16px 18px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      border-left: 3px solid var(--teal);
+      margin-bottom: 26px;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 24px 0;
+    }
+
+    /* Breakdown list */
+    .breakdown-title {
+      font-size: .88rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    .breakdown-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+
+    .breakdown-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 11px 14px;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    .breakdown-icon {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .68rem;
+      font-weight: 900;
+      margin-top: 1px;
+    }
+
+    .icon-red    { background: rgba(239,68,68,.1);   color: #DC2626; }
+    .icon-amber  { background: rgba(245,158,11,.1);  color: #D97706; }
+    .icon-green  { background: rgba(34,197,94,.1);   color: #16A34A; }
+    .icon-teal   { background: rgba(29,158,117,.1);  color: var(--teal); }
+
+    .breakdown-content { flex: 1; }
+
+    .breakdown-category {
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--text-2);
+      margin-bottom: 2px;
+    }
+
+    .breakdown-detail {
+      font-size: .78rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    /* CTA box */
+    .cta-box {
+      background: var(--teal-light);
+      border: 1px solid var(--teal-border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+    }
+
+    .cta-box-text {
+      font-size: .88rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .btn-cta {
+      display: block;
+      background: var(--teal);
+      color: var(--white);
+      text-align: center;
+      padding: 15px 24px;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: .95rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all var(--transition);
+      letter-spacing: -.1px;
+    }
+
+    .btn-cta:hover {
+      background: var(--teal-dark);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(29,158,117,.28);
+    }
+
+    /* Powered by */
+    .powered-by {
+      text-align: center;
+      margin-top: 20px;
+      font-size: .75rem;
+      color: var(--text-light);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <span class="logo-wordmark">Climbr</span>
+    <span class="header-badge">Free Audit</span>
+  </header>
+
+  <main class="wrapper">
+
+    <!-- Progress bar -->
+    <div class="progress-bar-wrap" id="progress-bar-wrap" style="display:none;">
+      <div class="progress-meta">
+        <span class="progress-label" id="progress-label">Question 1 of 7</span>
+        <span class="progress-pct" id="progress-pct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="card">
+
+      <!-- ══ INTRO ══ -->
+      <div class="screen active" id="screen-intro">
+        <div class="intro-logo">Climbr</div>
+        <h1 class="intro-headline">Is your shed sales pipeline flying blind?</h1>
+        <p class="intro-subhead">Take the 2-minute audit and find out exactly where leads are slipping through the cracks.</p>
+        <div class="audit-meta">
+          <div class="audit-meta-item">
+            <svg class="meta-icon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            2 minutes
+          </div>
+          <div class="audit-meta-item">
+            <svg class="meta-icon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            7 questions
+          </div>
+          <div class="audit-meta-item">
+            <svg class="meta-icon" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Free results
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="startAudit()">Start the audit →</button>
+      </div>
+
+      <!-- ══ QUESTION ══ -->
+      <div class="screen" id="screen-question">
+        <div class="q-number" id="q-number">Question 1 of 7</div>
+        <div class="q-text" id="q-text"></div>
+        <div class="options" id="q-options" role="radiogroup"></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="btn-back" onclick="prevQuestion()" style="display:none;">← Back</button>
+          <button class="btn btn-primary" id="btn-next" onclick="nextQuestion()" disabled>Next →</button>
+        </div>
+      </div>
+
+      <!-- ══ EMAIL GATE ══ -->
+      <div class="screen" id="screen-gate">
+        <h2 class="gate-headline">You're almost there — see your results</h2>
+        <p class="gate-subhead">Enter your info below to unlock your personalized pipeline score and breakdown.</p>
+        <div class="gate-score-preview">
+          <span class="gate-score-icon">📊</span>
+          <span class="gate-score-text">Your audit is complete — results are ready to reveal.</span>
+        </div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="firstName">First Name <span class="req">*</span></label>
+            <input type="text" id="firstName" placeholder="Your first name" autocomplete="given-name" />
+            <span class="field-error" id="err-firstName">Please enter your first name.</span>
+          </div>
+          <div class="form-field">
+            <label for="businessName">Business Name <span class="req">*</span></label>
+            <input type="text" id="businessName" placeholder="Your business name" />
+            <span class="field-error" id="err-businessName">Please enter your business name.</span>
+          </div>
+          <div class="form-field full">
+            <label for="email">Email Address <span class="req">*</span></label>
+            <input type="email" id="email" placeholder="you@yourcompany.com" autocomplete="email" />
+            <span class="field-error" id="err-email">Please enter a valid email address.</span>
+          </div>
+          <div class="form-field full">
+            <label for="phone">Phone Number <span class="opt">(optional)</span></label>
+            <input type="tel" id="phone" placeholder="(555) 000-0000" autocomplete="tel" />
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="goBackFromGate()">← Back</button>
+          <button class="btn btn-primary" id="btn-submit" onclick="submitAudit()">Show my results →</button>
+        </div>
+        <p class="submit-note">No spam. Your results are free — always.</p>
+      </div>
+
+      <!-- ══ LOADING ══ -->
+      <div class="screen" id="screen-loading">
+        <div class="loading-wrap">
+          <div class="loading-spinner"></div>
+          <div class="loading-text">Calculating your score...</div>
+        </div>
+      </div>
+
+      <!-- ══ RESULTS ══ -->
+      <div class="screen" id="screen-results">
+        <div class="results-eyebrow">Pipeline Visibility Score</div>
+        <h2 class="results-headline" id="results-headline"></h2>
+
+        <div class="score-meter">
+          <div class="score-meter-meta">
+            <span class="score-meter-label">Your score</span>
+            <span class="score-meter-val" id="score-val">—</span>
+          </div>
+          <div class="score-meter-track">
+            <div class="score-meter-fill" id="score-fill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <div class="results-summary" id="results-summary"></div>
+
+        <div class="breakdown-title">Where your pipeline is leaking</div>
+        <div class="breakdown-list" id="breakdown-list"></div>
+
+        <div class="divider"></div>
+
+        <div class="cta-box">
+          <div class="cta-box-text" id="cta-text"></div>
+          <!-- TODO: Replace # with the Climbr calendar/booking link -->
+          <a href="#" class="btn-cta" id="cta-btn">Book a free pipeline review →</a>
+        </div>
+      </div>
+
+    </div><!-- /card -->
+
+    <div class="powered-by" id="powered-footer" style="display:none;">
+      Powered by <strong>Automate South</strong>
+    </div>
+
+  </main>
+
+  <script>
+    // ── QUESTIONS DATA ───────────────────────────────────────────────────────
+    const questions = [
+      {
+        id: 1,
+        category: 'Lead capture',
+        text: 'When a customer calls about a shed, where does that lead get recorded?',
+        options: [
+          { score: 0, text: 'It usually stays in my head or on paper' },
+          { score: 1, text: 'We use a spreadsheet or notes app' },
+          { score: 2, text: 'We have a shared system but it\'s inconsistent' },
+          { score: 3, text: 'Every lead is logged in a central system automatically' },
+        ],
+        details: [
+          'Leads going unrecorded means you can\'t manage what you can\'t see.',
+          'Spreadsheets are passive — they won\'t remind you or flag what\'s falling behind.',
+          'An inconsistent system is almost as costly as no system.',
+          'Lead capture is dialed in — this is the foundation of everything else.',
+        ],
+      },
+      {
+        id: 2,
+        category: 'Quote tracking',
+        text: 'How do you know which leads are still waiting on a quote?',
+        options: [
+          { score: 0, text: 'Honestly, we often don\'t — some fall through the cracks' },
+          { score: 1, text: 'I try to remember or check notes periodically' },
+          { score: 2, text: 'We have a list but it takes manual effort to check' },
+          { score: 3, text: 'Our system flags overdue quotes automatically' },
+        ],
+        details: [
+          'Quotes are going out and disappearing. No way to know who to follow up with.',
+          'Memory-based follow-up misses most of your potential deals.',
+          'Manual review means overdue quotes go unnoticed until it\'s too late.',
+          'Automated quote tracking removes the biggest reason deals stall.',
+        ],
+      },
+      {
+        id: 3,
+        category: 'Team visibility',
+        text: 'If a salesperson is out sick, can someone else pick up their leads without losing ground?',
+        options: [
+          { score: 0, text: 'Not really — their leads are basically in their head' },
+          { score: 1, text: 'Sometimes, if they left notes' },
+          { score: 2, text: 'Usually, but it takes digging through texts or emails' },
+          { score: 3, text: 'Yes — all activity and history is visible to the team' },
+        ],
+        details: [
+          'Your pipeline lives in individuals, not the business. One person out = lost deals.',
+          'Lead handoff is a gamble. Good notes sometimes, nothing other times.',
+          'The info exists but friction means it often doesn\'t get shared in time.',
+          'Full team visibility means no lead depends on any one person.',
+        ],
+      },
+      {
+        id: 4,
+        category: 'Follow-up process',
+        text: 'How do you follow up with leads who didn\'t buy the first time?',
+        options: [
+          { score: 0, text: 'We don\'t have a consistent process — it depends on the day' },
+          { score: 1, text: 'We call back if we remember or they call us' },
+          { score: 2, text: 'We have a follow-up routine but it\'s manual' },
+          { score: 3, text: 'Automated reminders or sequences handle most of it' },
+        ],
+        details: [
+          'No follow-up process means deals are going cold every week.',
+          'Reactive follow-up only reaches leads who are already ready — missing everyone else.',
+          'Manual sequences break. Automation doesn\'t miss follow-ups.',
+          'Automated follow-up is your silent sales rep that never takes a day off.',
+        ],
+      },
+      {
+        id: 5,
+        category: 'Pipeline reporting',
+        text: 'At the end of the month, how do you know how many leads you actually had?',
+        options: [
+          { score: 0, text: 'I don\'t really know — no way to pull that number' },
+          { score: 1, text: 'I can estimate based on invoices or memory' },
+          { score: 2, text: 'I can piece it together from multiple places' },
+          { score: 3, text: 'I pull a report in minutes — total leads, source, close rate' },
+        ],
+        details: [
+          'Flying blind on volume and conversion. Can\'t improve what you can\'t measure.',
+          'Estimates aren\'t data. You can\'t spot trends with rough numbers.',
+          'Fragmented data means doing archaeology instead of analysis.',
+          'Real-time reporting lets you spot problems before they cost you the month.',
+        ],
+      },
+      {
+        id: 6,
+        category: 'Lead source tracking',
+        text: 'How do leads from your website, Facebook, or referrals get tracked differently?',
+        options: [
+          { score: 0, text: 'They all land in different places — it\'s pretty scattered' },
+          { score: 1, text: 'We try to note the source but it\'s hit or miss' },
+          { score: 2, text: 'We track sources but it\'s a manual process' },
+          { score: 3, text: 'Every source feeds into one place and is tagged automatically' },
+        ],
+        details: [
+          'You don\'t know which marketing is working. Budget decisions are guesswork.',
+          'Hit-or-miss source tracking means spending blind.',
+          'Manual source tagging is prone to gaps at the worst times.',
+          'Automatic source tracking shows exactly where your best leads come from.',
+        ],
+      },
+      {
+        id: 7,
+        category: 'Long-term lead retention',
+        text: 'When a customer is ready to buy 6 months after their initial inquiry, how likely are you to still have their info?',
+        options: [
+          { score: 0, text: 'Very unlikely — that lead is probably long gone' },
+          { score: 1, text: 'Maybe — if we kept a paper trail or they texted us' },
+          { score: 2, text: 'Probably, but we\'d have to dig for it' },
+          { score: 3, text: 'Yes — full history is searchable any time' },
+        ],
+        details: [
+          'Long-cycle buyers are your highest-value leads. Losing them at 6 months is expensive.',
+          'Paper trails break. Customers who come back shouldn\'t have to start over.',
+          'Recoverable but slow — a searchable CRM makes every past lead an asset.',
+          'Your customer database is a long-term revenue engine. This is how it should work.',
+        ],
+      },
+    ];
+
+    const TOTAL_Q = questions.length; // 7
+    const MAX_SCORE = TOTAL_Q * 3;    // 21
+
+    // Score bands (maxPct is upper bound, inclusive)
+    const bands = [
+      {
+        maxPct: 30,
+        key: 'blind',
+        headline: 'Your pipeline is running blind',
+        summary: 'Your leads are living in someone\'s head — or nowhere at all. You\'re likely losing 40–60% of your potential revenue simply because there\'s no system to track, follow up, or report on where things stand.',
+        cta: 'Climbr was built for exactly this situation. Shed dealers at this stage see the biggest lift — often 2–3x more leads converted just from adding structure. Let\'s show you what that looks like for your shop.',
+        color: '#EF4444',
+      },
+      {
+        maxPct: 55,
+        key: 'pieces',
+        headline: 'You have pieces, but no pipeline',
+        summary: 'You\'re tracking some things, but it\'s scattered across spreadsheets, texts, and memory. Your team probably has different versions of the truth — and leads are slipping through at every handoff.',
+        cta: 'The gap between where you are and a fully visible pipeline is smaller than you think. Climbr consolidates everything into one view your whole team can trust.',
+        color: '#F59E0B',
+      },
+      {
+        maxPct: 75,
+        key: 'leaky',
+        headline: 'Solid foundation, leaky follow-through',
+        summary: 'You\'ve got some systems in place, but they\'re manual and inconsistent. You\'re losing business not from a lack of effort — but from a lack of automation at the right moments.',
+        cta: 'You\'re one upgrade away from a real pipeline. Climbr adds automated follow-up, source tracking, and reporting on top of what you already do well.',
+        color: '#22C55E',
+      },
+      {
+        maxPct: 100,
+        key: 'ahead',
+        headline: 'You\'re ahead of most shed dealers',
+        summary: 'Your pipeline has real structure. The question is whether your current tools can scale with your business — and whether you\'re leaving money on the table in the gaps.',
+        cta: 'Even high-performing shops find blind spots when they see everything in one dashboard. Climbr can show you where your best leads are actually coming from.',
+        color: '#1D9E75',
+      },
+    ];
+
+    // Icon config per score value (0–3)
+    const scoreIcons = [
+      { cls: 'icon-red',   symbol: '✕' }, // 0 — critical gap
+      { cls: 'icon-amber', symbol: '!' }, // 1 — needs work
+      { cls: 'icon-amber', symbol: '~' }, // 2 — partially covered
+      { cls: 'icon-teal',  symbol: '✓' }, // 3 — in good shape
+    ];
+
+    // ── STATE ────────────────────────────────────────────────────────────────
+    const answers = {}; // { q1: 0-3, ... }
+    let currentQ = 1;
+
+    // ── UTILS ────────────────────────────────────────────────────────────────
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + id).classList.add('active');
+    }
+
+    function updateProgress(q) {
+      const pct = Math.round((q - 1) / TOTAL_Q * 100);
+      document.getElementById('progress-fill').style.width = pct + '%';
+      document.getElementById('progress-pct').textContent = pct + '%';
+      document.getElementById('progress-label').textContent = `Question ${q} of ${TOTAL_Q}`;
+    }
+
+    function getBand(pct) {
+      return bands.find(b => pct <= b.maxPct) || bands[bands.length - 1];
+    }
+
+    function calcScore() {
+      let total = 0;
+      for (let i = 1; i <= TOTAL_Q; i++) total += (answers['q' + i] ?? 0);
+      return total;
+    }
+
+    // ── START ────────────────────────────────────────────────────────────────
+    function startAudit() {
+      currentQ = 1;
+      document.getElementById('progress-bar-wrap').style.display = 'block';
+      renderQuestion(currentQ);
+      updateProgress(currentQ);
+      showScreen('question');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── RENDER QUESTION ──────────────────────────────────────────────────────
+    function renderQuestion(qNum) {
+      const q = questions[qNum - 1];
+      const letters = ['A', 'B', 'C', 'D'];
+
+      document.getElementById('q-number').textContent = `Question ${qNum} of ${TOTAL_Q}`;
+      document.getElementById('q-text').textContent = q.text;
+
+      const container = document.getElementById('q-options');
+      container.innerHTML = '';
+
+      q.options.forEach((opt, i) => {
+        const isSelected = answers['q' + qNum] === opt.score;
+        const label = document.createElement('label');
+        label.className = 'option' + (isSelected ? ' selected' : '');
+        label.dataset.score = opt.score;
+        label.innerHTML = `
+          <input type="radio" name="q${qNum}" value="${opt.score}" ${isSelected ? 'checked' : ''} />
+          <div class="option-radio"><div class="option-radio-dot"></div></div>
+          <span class="option-letter">${letters[i]}</span>
+          <span class="option-text">${opt.text}</span>
+        `;
+        label.addEventListener('click', () => selectOption(qNum, opt.score));
+        container.appendChild(label);
+      });
+
+      const btnNext = document.getElementById('btn-next');
+      btnNext.disabled = answers['q' + qNum] === undefined;
+      btnNext.textContent = qNum === TOTAL_Q ? 'See my results →' : 'Next →';
+
+      document.getElementById('btn-back').style.display = qNum > 1 ? 'inline-flex' : 'none';
+    }
+
+    // ── SELECT OPTION ────────────────────────────────────────────────────────
+    function selectOption(qNum, score) {
+      answers['q' + qNum] = score;
+      document.querySelectorAll('#q-options .option').forEach(opt => {
+        opt.classList.toggle('selected', parseInt(opt.dataset.score) === score);
+      });
+      document.getElementById('btn-next').disabled = false;
+    }
+
+    // ── NAVIGATE QUESTIONS ───────────────────────────────────────────────────
+    function nextQuestion() {
+      if (answers['q' + currentQ] === undefined) return;
+      if (currentQ === TOTAL_Q) {
+        document.getElementById('progress-bar-wrap').style.display = 'none';
+        showScreen('gate');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      currentQ++;
+      renderQuestion(currentQ);
+      updateProgress(currentQ);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function prevQuestion() {
+      if (currentQ <= 1) return;
+      currentQ--;
+      renderQuestion(currentQ);
+      updateProgress(currentQ);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function goBackFromGate() {
+      document.getElementById('progress-bar-wrap').style.display = 'block';
+      currentQ = TOTAL_Q;
+      renderQuestion(currentQ);
+      updateProgress(currentQ);
+      showScreen('question');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── VALIDATE FORM ────────────────────────────────────────────────────────
+    function validateGate() {
+      let valid = true;
+      const fields = [
+        { id: 'firstName',    errId: 'err-firstName',    check: v => v.trim().length >= 1 },
+        { id: 'businessName', errId: 'err-businessName', check: v => v.trim().length >= 1 },
+        { id: 'email',        errId: 'err-email',        check: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) },
+      ];
+      fields.forEach(f => {
+        const el  = document.getElementById(f.id);
+        const err = document.getElementById(f.errId);
+        const ok  = f.check(el.value);
+        el.classList.toggle('error', !ok);
+        err.classList.toggle('visible', !ok);
+        if (!ok) valid = false;
+      });
+      return valid;
+    }
+
+    // ── SUBMIT ───────────────────────────────────────────────────────────────
+    function submitAudit() {
+      if (!validateGate()) return;
+
+      showScreen('loading');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      const score = calcScore();
+      const pct   = Math.round(score / MAX_SCORE * 100);
+      const band  = getBand(pct);
+
+      // Brief timeout so the loading spinner is visible
+      setTimeout(() => {
+        renderResults(score, pct, band);
+        showScreen('results');
+        document.getElementById('powered-footer').style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 600);
+    }
+
+    // ── RENDER RESULTS ───────────────────────────────────────────────────────
+    function renderResults(score, pct, band) {
+      document.getElementById('results-headline').textContent = band.headline;
+      document.getElementById('score-val').textContent = pct + '%';
+      document.getElementById('results-summary').textContent = band.summary;
+      document.getElementById('cta-text').textContent = band.cta;
+
+      // Animate score meter after a brief delay
+      setTimeout(() => {
+        document.getElementById('score-fill').style.width  = pct + '%';
+        document.getElementById('score-fill').style.background = band.color;
+      }, 80);
+
+      // Breakdown list
+      const list = document.getElementById('breakdown-list');
+      list.innerHTML = '';
+      questions.forEach(q => {
+        const s  = answers['q' + q.id] ?? 0;
+        const ic = scoreIcons[s];
+        const item = document.createElement('div');
+        item.className = 'breakdown-item';
+        item.innerHTML = `
+          <div class="breakdown-icon ${ic.cls}">${ic.symbol}</div>
+          <div class="breakdown-content">
+            <div class="breakdown-category">${q.category}</div>
+            <div class="breakdown-detail">${q.details[s]}</div>
+          </div>
+        `;
+        list.appendChild(item);
+      });
+    }
+  </script>
+
+</body>
+</html>
