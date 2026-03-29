@@ -598,6 +598,13 @@
       margin-bottom: 36px;
     }
 
+    .result-greeting {
+      font-size: .95rem;
+      color: var(--gray-400);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
     .result-badge {
       display: inline-flex;
       align-items: center;
@@ -838,7 +845,7 @@
         <div class="logo-powered">⚙ Powered by Automate South</div>
       </div>
     </a>
-    <span class="header-badge">Free Audit Tool</span>
+    <span class="header-badge" id="header-badge">Free Audit Tool</span>
   </header>
 
   <!-- ── MAIN ── -->
@@ -872,7 +879,6 @@
 
       <!-- ══ SECTION 1 ══ -->
       <div class="panel active" id="section-1">
-        <div class="section-tag"><span class="dot"></span>Section 1 of 4</div>
         <div class="section-title">Your Incoming Opportunities</div>
         <div class="section-sub">Let's look at how your shop handles inbound calls and quote requests.</div>
 
@@ -1039,7 +1045,6 @@
 
       <!-- ══ SECTION 2 ══ -->
       <div class="panel" id="section-2">
-        <div class="section-tag"><span class="dot"></span>Section 2 of 4</div>
         <div class="section-title">Your Follow-Up Process</div>
         <div class="section-sub">How your shop handles estimates and in-progress communication makes a big difference.</div>
 
@@ -1162,7 +1167,6 @@
 
       <!-- ══ SECTION 3 ══ -->
       <div class="panel" id="section-3">
-        <div class="section-tag"><span class="dot"></span>Section 3 of 4</div>
         <div class="section-title">Your Time & Capacity</div>
         <div class="section-sub">Understanding where your team's hours actually go reveals your biggest opportunity.</div>
 
@@ -1285,7 +1289,6 @@
 
       <!-- ══ SECTION 4 ══ -->
       <div class="panel" id="section-4">
-        <div class="section-tag"><span class="dot"></span>Section 4 of 4</div>
         <div class="section-title">Almost Done — Where Should We Send Your Results?</div>
         <div class="section-sub">A ShopCommand specialist will personally review your audit and reach out within 24 hours.</div>
 
@@ -1300,16 +1303,6 @@
             <input type="text" id="shopName" placeholder="Your shop name" />
             <span class="field-error" id="err-shopName">Please enter your shop name.</span>
           </div>
-          <div class="form-field">
-            <label for="phone">Phone Number <span>*</span></label>
-            <input type="tel" id="phone" placeholder="(555) 000-0000" autocomplete="tel" />
-            <span class="field-error" id="err-phone">Please enter a valid phone number.</span>
-          </div>
-          <div class="form-field">
-            <label for="email">Email Address <span>*</span></label>
-            <input type="email" id="email" placeholder="you@yourshop.com" autocomplete="email" />
-            <span class="field-error" id="err-email">Please enter a valid email address.</span>
-          </div>
           <div class="form-field full">
             <label for="bestTime">Best Time to Reach You <span>*</span></label>
             <select id="bestTime">
@@ -1319,6 +1312,16 @@
               <option value="Evening">Evening (5pm – 8pm)</option>
             </select>
             <span class="field-error" id="err-bestTime">Please select a preferred time.</span>
+          </div>
+          <div class="form-field">
+            <label for="phone">Phone Number <span>*</span></label>
+            <input type="tel" id="phone" placeholder="(555) 000-0000" autocomplete="tel" />
+            <span class="field-error" id="err-phone">Please enter a valid phone number.</span>
+          </div>
+          <div class="form-field">
+            <label for="email">Email Address <span>*</span></label>
+            <input type="email" id="email" placeholder="you@yourshop.com" autocomplete="email" />
+            <span class="field-error" id="err-email">Please enter a valid email address.</span>
           </div>
         </div>
 
@@ -1346,6 +1349,7 @@
     <!-- ══ RESULT PANEL ══ -->
     <div class="card" id="result-panel">
       <div class="result-header">
+        <p class="result-greeting" id="result-greeting"></p>
         <div class="result-badge" id="result-badge">Audit Complete</div>
         <div class="result-tier" id="result-tier"></div>
         <div class="result-score-row">
@@ -1391,6 +1395,19 @@
     let currentSection = 1;
     const totalSections = 4;
 
+    // ── QUESTION → PROGRESS % MAP ─────────────────────
+    // 10 questions fill 0–75%; contact section = 75%; results = 100%
+    const questionPct = { 1:6.25,2:12.5,3:18.75,4:25,5:33.33,6:41.67,7:50,8:58.33,9:66.67,10:75 };
+
+    function updateProgressByAnswers() {
+      const answered = Object.keys(answers).map(k => parseInt(k.replace('q',''),10));
+      if (!answered.length) return;
+      const highest = Math.max(...answered);
+      const pct = questionPct[highest] || 0;
+      progressFill.style.width = pct + '%';
+      progressPct.textContent  = Math.round(pct) + '% Complete';
+    }
+
     // ── OPTION CLICK HANDLER ───────────────────────────
     document.querySelectorAll('.option').forEach(opt => {
       opt.addEventListener('click', () => {
@@ -1407,6 +1424,9 @@
         // Hide validation message if shown
         const vMsg = document.getElementById(`val-${q}`);
         if (vMsg) vMsg.classList.remove('visible');
+
+        // Increment progress bar
+        updateProgressByAnswers();
       });
     });
 
@@ -1416,10 +1436,12 @@
     const progressLabel = document.getElementById('progress-section-label');
 
     function updateProgress(section) {
-      // 4 sections + results = 5 states; progress fills on question sections only
-      const pct = Math.round(((section - 1) / totalSections) * 100);
-      progressFill.style.width = pct + '%';
-      progressPct.textContent  = pct + '% Complete';
+      // Progress bar is driven by question answers (0–75%) and section nav (for section label/steps)
+      // When entering section 4 (contact), ensure bar shows 75%
+      if (section === 4) {
+        progressFill.style.width = '75%';
+        progressPct.textContent  = '75% Complete';
+      }
       progressLabel.textContent = `Section ${Math.min(section, totalSections)} of ${totalSections}`;
 
       for (let i = 1; i <= totalSections; i++) {
@@ -1622,9 +1644,19 @@
 
     // ── SHOW RESULTS ──────────────────────────────────
     function showResults(score, tier) {
+      // Complete the progress bar
+      progressFill.style.width = '100%';
+      progressPct.textContent  = '100% Complete';
+
       // Hide form
       document.getElementById('main-card').style.display    = 'none';
       document.getElementById('progress-wrap').style.display = 'none';
+
+      // Personalized greeting
+      const firstName = document.getElementById('firstName').value.trim();
+      const shopName  = document.getElementById('shopName').value.trim();
+      document.getElementById('result-greeting').textContent =
+        `Here's your ShopCommand audit, ${firstName} from ${shopName}.`;
 
       // Build result UI
       const badge   = document.getElementById('result-badge');
@@ -1661,6 +1693,7 @@
 
     // ── INIT ──────────────────────────────────────────
     updateProgress(1);
+    document.getElementById('header-badge').style.display = 'none';
   </script>
 </body>
 </html>
