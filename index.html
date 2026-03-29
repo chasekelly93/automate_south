@@ -79,10 +79,11 @@
     }
 
     .logo-text {
-      font-size: 1.1rem;
-      font-weight: 800;
+      font-size: 1.25rem;
+      font-weight: 900;
       color: var(--white);
-      letter-spacing: -.3px;
+      letter-spacing: -.4px;
+      line-height: 1.1;
     }
 
     .logo-text span { color: var(--amber); }
@@ -198,13 +199,26 @@
 
     .progress-step {
       font-size: .7rem;
-      font-weight: 500;
+      font-weight: 600;
       color: var(--gray-500);
-      transition: color var(--transition);
+      padding: 4px 10px;
+      border-radius: 100px;
+      transition: all var(--transition);
     }
 
-    .progress-step.active { color: var(--amber); }
-    .progress-step.done   { color: var(--green); }
+    .progress-step.active {
+      background: var(--amber);
+      color: var(--navy);
+      font-weight: 700;
+    }
+
+    .progress-step.done {
+      color: var(--green);
+    }
+
+    .progress-step.done::before {
+      content: '✓ ';
+    }
 
     /* ── CARD ───────────────────────────────────────── */
     .card {
@@ -753,6 +767,43 @@
       margin: 28px 0;
     }
 
+    /* ── AUDIT HOOK ─────────────────────────────────── */
+    .audit-hook {
+      margin-bottom: 32px;
+    }
+
+    .hook-main {
+      font-size: .95rem;
+      color: var(--gray-300);
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+
+    .hook-stat {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      background: var(--navy);
+      border-left: 4px solid var(--amber);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 18px 20px;
+    }
+
+    .stat-number {
+      font-size: 2.8rem;
+      font-weight: 900;
+      color: var(--amber);
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .stat-label {
+      font-size: .88rem;
+      color: var(--white);
+      line-height: 1.6;
+      padding-top: 4px;
+    }
+
     /* ── TRUST STRIP ────────────────────────────────── */
     .trust-strip {
       display: flex;
@@ -784,7 +835,7 @@
       <div class="logo-icon">⚙</div>
       <div>
         <div class="logo-text">Shop<span>Command</span></div>
-        <div class="logo-powered">Powered by Automate South</div>
+        <div class="logo-powered">⚙ Powered by Automate South</div>
       </div>
     </a>
     <span class="header-badge">Free Audit Tool</span>
@@ -824,6 +875,14 @@
         <div class="section-tag"><span class="dot"></span>Section 1 of 4</div>
         <div class="section-title">Your Incoming Opportunities</div>
         <div class="section-sub">Let's look at how your shop handles inbound calls and quote requests.</div>
+
+        <div class="audit-hook">
+          <p class="hook-main">Most body shops aren't losing business because of bad work. They're losing it in the 10 minutes after someone calls. Answer 10 quick questions and find out exactly where your shop is leaking — and how much it's costing you.</p>
+          <div class="hook-stat">
+            <span class="stat-number">75</span>
+            <span class="stat-label">One shop just like yours cut their weekly calls by 75 and saved 5–10 hours of staff time — without hiring anyone new.</span>
+          </div>
+        </div>
 
         <!-- Q1 -->
         <div class="question-block" id="qblock-1">
@@ -1462,22 +1521,25 @@
       {
         min: 10, max: 16,
         color: 'green',
+        hex: '#22c55e',
         label: 'Tier 1 — Solid Operator',
         title: 'Your Shop Is Running Tight',
-        message: "You've got solid systems in place. There may still be some gaps worth tightening — we'll review your answers and reach out with specific feedback within 24 hours.",
+        message: "You've got solid systems in place. There may still be some gaps worth tightening — a ShopCommand specialist will review your answers and reach out within 24 hours with specific feedback for your shop.",
         leakPct: 22,
       },
       {
         min: 17, max: 24,
         color: 'yellow',
+        hex: '#f59e0b',
         label: 'Tier 2 — Room to Improve',
-        title: 'You\'re Leaving Some Jobs on the Table',
+        title: "You're Leaving Some Jobs on the Table",
         message: "Your shop has real opportunity being missed right now. Based on your answers, you're likely losing 3–5 jobs per week that you were already called about. We'll reach out within 24 hours with a personalized breakdown.",
         leakPct: 50,
       },
       {
         min: 25, max: 32,
         color: 'orange',
+        hex: '#f97316',
         label: 'Tier 3 — Significant Leak',
         title: 'Your Shop Has a Significant Leak',
         message: "Based on your answers, your shop is likely losing 5–10+ jobs every week — not from lack of calls, but from lack of follow-up. One shop just like yours saved 75 calls per week and 5–10 hours of staff time after plugging these exact leaks. We'll reach out within 24 hours.",
@@ -1486,9 +1548,10 @@
       {
         min: 33, max: 40,
         color: 'red',
+        hex: '#ef4444',
         label: 'Tier 4 — Critical',
         title: 'Your Shop Is Hemorrhaging Opportunities',
-        message: "Your shop is almost certainly losing $10,000–$20,000+ in potential revenue every month from missed follow-ups and dropped inquiries. The good news: this is completely fixable. We'll reach out within 24 hours with a custom plan.",
+        message: "Your shop is almost certainly losing $10,000–$20,000+ in potential revenue every month from missed follow-ups and dropped inquiries. The good news: this is completely fixable. We'll reach out within 24 hours with a custom plan for your shop.",
         leakPct: 95,
       },
     ];
@@ -1574,6 +1637,7 @@
       badge.className  = `result-badge ${tier.color}`;
       badge.textContent = tier.label;
       tierEl.textContent = tier.title;
+      tierEl.style.color = tier.hex;
       scoreEl.textContent = score;
       msgEl.textContent   = tier.message;
       pctLbl.textContent  = `${tier.leakPct}% leaking`;
