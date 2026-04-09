@@ -15,6 +15,9 @@ const BASE_URL =
 const PORT = process.env.PORT || 3000;
 const MCP_SECRET = process.env.MCP_SECRET; // optional bearer token for security
 
+const DATAIKU_HOST = process.env.DATAIKU_HOST; // e.g. https://dss.example.com
+const DATAIKU_API_KEY = process.env.DATAIKU_API_KEY;
+
 if (!API_KEY) {
   console.error("Error: GHL_API_KEY environment variable is not set.");
   process.exit(1);
@@ -62,6 +65,41 @@ const ghl = {
   locationPost: (path, body) =>
     ghlRequest("POST", path, body, LOCATION_API_KEY || API_KEY),
 };
+
+// ---------------------------------------------------------------------------
+// Dataiku DSS API client helper
+// ---------------------------------------------------------------------------
+
+async function dataikuRequest(method, path) {
+  if (!DATAIKU_HOST || !DATAIKU_API_KEY) {
+    throw new Error(
+      "Dataiku DSS is not configured. Set DATAIKU_HOST and DATAIKU_API_KEY environment variables."
+    );
+  }
+
+  const url = `${DATAIKU_HOST.replace(/\/+$/, "")}/public/api${path}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${DATAIKU_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!res.ok) {
+    throw new Error(`Dataiku API error ${res.status}: ${JSON.stringify(data)}`);
+  }
+
+  return data;
+}
 
 // ---------------------------------------------------------------------------
 // Tool definitions
@@ -254,6 +292,16 @@ const tools = [
       required: [],
     },
   },
+  {
+    name: "list_dataiku_projects",
+    description:
+      "List all projects available on the connected Dataiku DSS instance. Returns project key, name, owner, description, and other metadata for each project.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -415,6 +463,11 @@ async function handleGetBillingCharges(args) {
   return JSON.stringify(results, null, 2);
 }
 
+async function handleListDataikuProjects() {
+  const data = await dataikuRequest("GET", "/projects/");
+  return JSON.stringify(data, null, 2);
+}
+
 const handlers = {
   get_sub_accounts: handleGetSubAccounts,
   get_contacts: handleGetContacts,
@@ -423,6 +476,7 @@ const handlers = {
   send_message: handleSendMessage,
   create_api_key: handleCreateApiKey,
   get_billing_charges: handleGetBillingCharges,
+  list_dataiku_projects: handleListDataikuProjects,
 };
 
 // ---------------------------------------------------------------------------
