@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "dataiku_factory": {
+      "type": "stdio",
+      "command": "/home/user/dataiku_factory/.venv/bin/python",
+      "args": [
+        "/home/user/dataiku_factory/scripts/mcp_server.py"
+      ],
+      "env": {
+        "DSS_HOST": "https://designer-eks.dataiku.corp.wabtec.com/",
+        "DSS_API_KEY": "dkuaps-viFPuobGN1Vp8u4K1adkp07Gb3BJLcsN",
+        "DSS_INSECURE_TLS": "true"
+      }
+    }
+  }
+}
